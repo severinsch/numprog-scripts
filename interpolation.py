@@ -1,4 +1,6 @@
 import math
+from fractions import Fraction
+from typing import Union
 
 
 class Cell:
@@ -39,7 +41,7 @@ class NewtonCalcCell(Cell):
         self.c2 = c2
         self.x1 = x1
         self.x2 = x2
-        self.value = (c1 - c2) / (x1 - x2)
+        self.value = Fraction((c1 - c2), (x1 - x2))
 
         numerator = f"{self.c1} {'-' if self.c2 >= 0 else '+'} {abs(self.c2)}"
         denominator = f"{self.x1} {'-' if self.x2 >= 0 else '+'} {abs(self.x2)}"
@@ -63,7 +65,7 @@ class AitkenNevilleCalcCell(Cell):
         self.x1 = x1
         self.x2 = x2
         self.x = x
-        self.value = p1 + ((x - x1) / (x2 - x1)) * (p2 - p1)
+        self.value = p1 + Fraction((x - x1), (x2 - x1)) * (p2 - p1)
 
         numerator = f"{self.x} {'-' if self.x1 >= 0 else '+'} {abs(self.x1)}"
         denominator = f"{self.x2} {'-' if self.x1 >= 0 else '+'} {abs(self.x1)}"
@@ -84,24 +86,27 @@ def print_table(table: [[Cell]], points: [(int, int)], aitken: bool):
     max_widths: [int] = list(map(lambda a: len(max(a, key=lambda c: len(c.line)).line) + 2, table))
     # all cell widths,      start,           all |
     line_length = sum(max_widths) + len('x_i | i\\k |') + len(table) * 3
-    result = ' x_i | i\\k | ' + ''.join([f'{str(i):^{max_widths[i]}} |' for i in range((len(table)))]) + '\n'
+    result = '  x_i  | i\\k | ' + ''.join([f'{str(i):^{max_widths[i]}} |' for i in range((len(table)))]) + '\n'
     result += '-' * line_length + '\n'
     for row_part in range(4 * len(table)):
         row = math.floor(row_part / 4)
 
         match row_part % 4:
             case 0:
-                result += f'     |     | '
+                result += f'       |     | '
             case 1:
-                result += f'  {points[row][0]}  |  {row}  | '
+                spaces = 7 - len(str(points[row][0]))
+                result += (spaces//2)*' ' + f'{points[row][0]}' + (spaces//2)*' ' + f'|  {row}  | '
             case 2:
-                result += f'     |     | '
+                result += f'       |     | '
             case 3:
-                result += 13 * '-'
+                result += 14 * '-'
 
         for column in range(len(table)):
             cell = table[column][row]
-            if not (isinstance(cell, ValueCell) or isinstance(cell, NewtonCalcCell) or isinstance(cell, AitkenNevilleCalcCell)):
+            if not (isinstance(cell, ValueCell) or
+                    isinstance(cell, NewtonCalcCell) or
+                    isinstance(cell, AitkenNevilleCalcCell)):
                 result += (max_widths[column] + 3) * ' ' if row_part % 4 != 3 else '-'
             else:
                 match row_part % 4:
@@ -130,7 +135,10 @@ def print_table(table: [[Cell]], points: [(int, int)], aitken: bool):
     print(result)
 
 
-def interpolate_newton(points: [(float, float)]):
+def interpolate_newton(points: [(Union[float, Fraction], Union[float, Fraction])]):
+    points = list(map(lambda p: (Fraction(p[0]).limit_denominator(10000),Fraction(p[1]).limit_denominator(10000)),
+                      points))
+
     xs = list(map(lambda p: p[0], points))
 
     table: [[Cell]] = [[Cell() for _ in range(len(points))] for _ in range(len(points))]
@@ -149,7 +157,11 @@ def interpolate_newton(points: [(float, float)]):
     print_table(table, points, False)
 
 
-def interpolate_aitken_neville(points: [(float, float)], x: float):
+def interpolate_aitken_neville(points: [(Union[float, Fraction], Union[float, Fraction])], x: float):
+    points = list(map(lambda p: (Fraction(p[0]).limit_denominator(10000),Fraction(p[1]).limit_denominator(10000)),
+                      points))
+    x = Fraction(x)
+
     xs = list(map(lambda p: p[0], points))
 
     table: [[Cell]] = [[Cell() for _ in range(len(points))] for _ in range(len(points))]
@@ -168,5 +180,5 @@ def interpolate_aitken_neville(points: [(float, float)], x: float):
     print_table(table, points, True)
 
 
-# interpolate_aitken_neville([(0, 3), (1, 0), (2, 1)], 0.5)
-interpolate_newton([(0, 3), (1, 0), (2, 1)])
+interpolate_aitken_neville([(0, 3), (1, 0), (2, 1)], 0.5)
+# interpolate_newton([(0, 0), (1.5, 1.2), (2, 0), (1/3, 0.5)])
